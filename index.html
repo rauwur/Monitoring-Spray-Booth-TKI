@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MONITORING SPRAY BOOTH TKI - MQTT</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Paho MQTT WS CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: #212328;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 0;
+            margin: 0;
+        }
+
+        .mobile-container {
+            width: 100%;
+            max-width: 420px;
+            background-color: #212328;
+            min-height: 100vh;
+            padding: 25px 20px 40px 20px;
+            position: relative;
+        }
+
+        .hidden { display: none !important; }
+
+        .login-box {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 80vh;
+        }
+
+        .login-title {
+            text-align: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: 0.8px;
+            margin-bottom: 8px;
+        }
+
+        .login-subtitle {
+            text-align: center;
+            font-size: 12px;
+            color: #8b92a2;
+            margin-bottom: 30px;
+        }
+
+        .form-group { margin-bottom: 20px; }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #9299a9;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .custom-input, .custom-select {
+            width: 100%;
+            background-color: #2a2d34;
+            border: 1px solid #32353e;
+            color: #e0e6ed;
+            padding: 12px 14px;
+            font-size: 15px;
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .custom-input:focus, .custom-select:focus { border-color: #c4f124; }
+
+        .select-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        .custom-select {
+            appearance: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+            padding-right: 32px;
+        }
+
+        .select-wrapper::after {
+            content: '∨';
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #8b92a2;
+            font-size: 14px;
+            pointer-events: none;
+        }
+
+        .btn-login {
+            width: 100%;
+            background-color: #c4f124;
+            color: #181a1e;
+            border: none;
+            padding: 14px;
+            font-size: 15px;
+            font-weight: 700;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: opacity 0.2s;
+        }
+
+        .btn-login:active { opacity: 0.8; }
+
+        .error-message {
+            color: #ff4757;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: center;
+            margin-top: 12px;
+            min-height: 18px;
+        }
+
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .header-subtitle {
+            font-size: 13px;
+            color: #a2a8b6;
+            font-weight: 600;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+        }
+
+        .user-badge {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .user-badge.admin {
+            background-color: rgba(196, 241, 36, 0.2);
+            color: #c4f124;
+            border: 1px solid #c4f124;
+        }
+
+        .user-badge.operator {
+            background-color: rgba(139, 146, 162, 0.2);
+            color: #8b92a2;
+            border: 1px solid #5d6373;
+        }
+
+        .btn-logout {
+            background: none;
+            border: none;
+            color: #ff4757;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px 16px;
+        }
+
+        .grid-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .item-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #9299a9;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            text-align: center;
+            width: 100%;
+        }
+
+        .gauge-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .gauge-canvas { width: 150px; height: 150px; }
+
+        .gauge-value-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            white-space: nowrap;
+            max-width: 78%;
+        }
+
+        .gauge-num {
+            font-size: 24px;
+            font-weight: 700;
+            color: #c4f124;
+            letter-spacing: -0.5px;
+            transition: font-size 0.2s ease;
+        }
+
+        .gauge-unit {
+            font-size: 11px;
+            font-weight: 600;
+            color: #c4f124;
+            margin-left: 2px;
+        }
+
+        .control-block {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .custom-input:disabled, .custom-select:disabled {
+            background-color: #1d1f24;
+            color: #5d6373;
+            border-color: #282b32;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .section-box {
+            margin-top: 24px;
+            background-color: #282b32;
+            border-radius: 8px;
+            padding: 14px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #9299a9;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            width: 100%;
+            height: 180px;
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .filter-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: #8b92a2;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .date-input {
+            width: 100%;
+            background-color: #212328;
+            border: 1px solid #32353e;
+            color: #ffffff;
+            padding: 8px;
+            font-size: 11px;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        .date-input::-webkit-calendar-picker-indicator { filter: invert(1); }
+
+        .btn-download-full {
+            width: 100%;
+            background-color: #c4f124;
+            color: #181a1e;
+            border: none;
+            padding: 10px;
+            font-size: 12px;
+            font-weight: 700;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .btn-download-full:active { opacity: 0.8; }
+
+        .status-bar {
+            margin-top: 24px;
+            padding: 10px 12px;
+            background-color: #282b32;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #8b92a2;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dot-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #ff4757;
+        }
+
+        .dot-status.online {
+            background-color: #2ed573;
+            box-shadow: 0 0 6px #2ed573;
+        }
+
+        .relay-badge {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 10px;
+            background-color: #32353e;
+            color: #7e8494;
+        }
+
+        .relay-badge.active {
+            background-color: #ff4757;
+            color: #ffffff;
+            box-shadow: 0 0 8px rgba(255, 71, 87, 0.4);
+        }
+
+        .relay-badge.cleaning {
+            background-color: #ff9f43;
+            color: #ffffff;
+            box-shadow: 0 0 8px rgba(255, 159, 67, 0.4);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="mobile-container">
+        
+        <!-- LOGIN SCREEN -->
+        <div id="loginScreen" class="login-box">
+            <h1 class="login-title">LOGIN SYSTEM</h1>
+            <p class="login-subtitle">MONITORING SPRAY BOOTH TKI</p>
+
+            <div class="form-group">
+                <label class="form-label">Pilih User</label>
+                <div class="select-wrapper">
+                    <select id="loginUser" class="custom-select">
+                        <option value="operator">Operator</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" id="loginPassword" class="custom-input" placeholder="Masukkan password">
+            </div>
+
+            <button type="button" class="btn-login" onclick="handleLogin()">MASUK</button>
+            <div id="loginError" class="error-message"></div>
+        </div>
+
+        <!-- DASHBOARD SCREEN -->
+        <div id="dashboardScreen" class="hidden">
+            
+            <div class="header-section">
+                <h2 class="header-subtitle">MONITORING SPRAY BOOTH TKI</h2>
+                <div>
+                    <span id="roleBadge" class="user-badge"></span>
+                    <button class="btn-logout" onclick="handleLogout()">Keluar</button>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                
+                <div class="grid-item">
+                    <div class="item-label">KADAR TVOC</div>
+                    <div class="gauge-container">
+                        <canvas id="gaugeTVOC" class="gauge-canvas" width="300" height="300"></canvas>
+                        <div class="gauge-value-box">
+                            <span id="valTVOC" class="gauge-num">0.00</span>
+                            <span class="gauge-unit">ppb</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-item">
+                    <div class="item-label">KADAR CO2</div>
+                    <div class="gauge-container">
+                        <canvas id="gaugeCO2" class="gauge-canvas" width="300" height="300"></canvas>
+                        <div class="gauge-value-box">
+                            <span id="valCO2" class="gauge-num">0.00</span>
+                            <span class="gauge-unit">ppm</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-item control-block">
+                    <div class="item-label" style="text-align: left;">AMBANG BATAS (PPB)</div>
+                    <input type="number" id="inputThreshold" class="custom-input" step="0.01" onchange="updateThreshold(this.value)">
+                </div>
+
+                <div class="grid-item">
+                    <div class="item-label">TEMPERATURE</div>
+                    <div class="gauge-container">
+                        <canvas id="gaugeTemp" class="gauge-canvas" width="300" height="300"></canvas>
+                        <div class="gauge-value-box">
+                            <span id="valTemp" class="gauge-num">0.00</span>
+                            <span class="gauge-unit">°C</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-item control-block">
+                    <div class="item-label" style="text-align: left;">CEK AREA</div>
+                    <div class="select-wrapper">
+                        <select id="selectStation" class="custom-select" onchange="updateStation(this.value)">
+                            <option value="1">Station 1</option>
+                            <option value="2" selected>Station 2</option>
+                            <option value="3">Station 3</option>
+                            <option value="4">Station 4</option>
+                        </select>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="section-box">
+                <span class="section-title">GRAFIK TREN REAL-TIME</span>
+                <div class="chart-wrapper">
+                    <canvas id="realtimeChart"></canvas>
+                </div>
+            </div>
+
+            <div class="section-box">
+                <span class="section-title">TARIK LOG RIWAYAT EXHAUST NYALA</span>
+                <div class="filter-grid">
+                    <div>
+                        <div class="filter-label">Tanggal Mulai</div>
+                        <input type="date" id="startDate" class="date-input">
+                    </div>
+                    <div>
+                        <div class="filter-label">Tanggal Selesai</div>
+                        <input type="date" id="endDate" class="date-input">
+                    </div>
+                </div>
+                <button class="btn-download-full" onclick="downloadExhaustEventCSV()">DOWNLOAD CSV LOG EXHAUST</button>
+            </div>
+
+            <div class="status-bar">
+                <div class="status-indicator">
+                    <div id="statusDot" class="dot-status"></div>
+                    <span id="statusText">Device Offline</span>
+                </div>
+                <div id="relayStatus" class="relay-badge">EXHAUST OFF</div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        // CONFIG MQTT TOPICS
+        const TOPIC_DATA   = "spraybooth/tki/data";
+        const TOPIC_SET_V2 = "spraybooth/tki/set_v2";
+        const TOPIC_SET_V3 = "spraybooth/tki/set_v3";
+
+        const PASSWORDS = { operator: '123', admin: '2026' };
+
+        let currentUserRole = null;
+        let currentTVOC = 0.00;
+        let currentCO2 = 0;
+        let currentTemp = 0;
+        let currentThresholdPPB = 500;
+
+        let cleaningTimer = 0;
+        let isExhaustActive = false;
+        let currentCycleStartTime = null;
+        let currentCycleStartTimestamp = 0;
+        let currentCycleSeconds = 0;
+        let currentCycleMaxTVOC = 0;
+        let currentCycleCO2s = [];
+        let currentCycleTemps = [];
+        let currentStationName = "Station 2";
+
+        let exhaustEventLogs = JSON.parse(localStorage.getItem('exhaustEventLogs')) || [];
+        let trendChart = null;
+        
+        let mqttClient = null;
+        let lastDataReceivedTime = 0;
+
+        function handleLogin() {
+            const user = document.getElementById('loginUser').value;
+            const pass = document.getElementById('loginPassword').value;
+            const errorEl = document.getElementById('loginError');
+
+            if (PASSWORDS[user] && PASSWORDS[user] === pass) {
+                errorEl.innerText = '';
+                currentUserRole = user;
+                
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('dashboardScreen').classList.remove('hidden');
+
+                applyUserRolePermissions();
+
+                drawGauge('gaugeTVOC', 0, 5000);
+                drawGauge('gaugeCO2', 0, 2000);
+                drawGauge('gaugeTemp', 0, 100);
+                
+                updateDisplayValue('valTVOC', '0.00');
+                updateDisplayValue('valCO2', '0.00');
+                updateDisplayValue('valTemp', '0.00');
+
+                initChart();
+                initMQTT();
+            } else {
+                errorEl.innerText = 'Password salah';
+            }
+        }
+
+        function handleLogout() {
+            currentUserRole = null;
+            if (mqttClient) mqttClient.disconnect();
+            document.getElementById('loginPassword').value = '';
+            document.getElementById('dashboardScreen').classList.add('hidden');
+            document.getElementById('loginScreen').classList.remove('hidden');
+        }
+
+        function applyUserRolePermissions() {
+            const badge = document.getElementById('roleBadge');
+            const inputThreshold = document.getElementById('inputThreshold');
+            const selectStation = document.getElementById('selectStation');
+
+            badge.innerText = currentUserRole.toUpperCase();
+            badge.className = `user-badge ${currentUserRole}`;
+
+            if (currentUserRole === 'operator') {
+                inputThreshold.disabled = true;
+                selectStation.disabled = true;
+            } else {
+                inputThreshold.disabled = false;
+                selectStation.disabled = false;
+            }
+        }
+
+        // INIT MQTT CLIENT
+        function initMQTT() {
+            const clientId = "WebClient-" + Math.floor(Math.random() * 10000);
+            mqttClient = new Paho.MQTT.Client("broker.hivemq.com", 8000, clientId);
+
+            mqttClient.onConnectionLost = onConnectionLost;
+            mqttClient.onMessageArrived = onMessageArrived;
+
+            mqttClient.connect({
+                onSuccess: onConnectSuccess,
+                onFailure: onConnectFailure,
+                useSSL: false
+            });
+        }
+
+        function onConnectSuccess() {
+            console.log("Terhubung ke MQTT Broker!");
+            mqttClient.subscribe(TOPIC_DATA);
+        }
+
+        function onConnectFailure(err) {
+            console.error("Gagal terhubung ke MQTT:", err);
+            setTimeout(initMQTT, 5000);
+        }
+
+        function onConnectionLost(response) {
+            console.warn("Koneksi MQTT terputus:", response.errorMessage);
+            setTimeout(initMQTT, 3000);
+        }
+
+        // TERIMA DATA DARI ESP32 REALTIME
+        function onMessageArrived(message) {
+            if (message.destinationName === TOPIC_DATA) {
+                lastDataReceivedTime = Date.now();
+                try {
+                    const data = JSON.parse(message.payloadString);
+
+                    currentTVOC = data.tvoc || 0;
+                    currentCO2  = data.co2 || 0;
+                    currentTemp = data.temp || 0;
+                    
+                    if (data.v2 !== undefined) {
+                        currentThresholdPPB = data.v2;
+                        const inputEl = document.getElementById('inputThreshold');
+                        if (document.activeElement !== inputEl) inputEl.value = currentThresholdPPB;
+                    }
+
+                    if (data.v3 !== undefined) {
+                        const selectEl = document.getElementById('selectStation');
+                        if (document.activeElement !== selectEl) selectEl.value = data.v3;
+                        currentStationName = `Station ${data.v3}`;
+                    }
+
+                    // Update UI
+                    updateDisplayValue('valTVOC', currentTVOC.toFixed(2));
+                    drawGauge('gaugeTVOC', currentTVOC, 5000);
+
+                    updateDisplayValue('valCO2', currentCO2.toFixed(2));
+                    drawGauge('gaugeCO2', currentCO2, 2000);
+
+                    updateDisplayValue('valTemp', currentTemp.toFixed(2));
+                    drawGauge('gaugeTemp', currentTemp, 100);
+
+                    // Update Grafik
+                    const nowTime = new Date().toLocaleTimeString('id-ID', { hour12: false });
+                    addChartData(nowTime, currentTVOC.toFixed(2), currentCO2, currentTemp);
+
+                    // Process Logic Exhaust & Status Bar
+                    processExhaustLogic();
+
+                } catch (e) {
+                    console.error("Gagal parsing JSON MQTT:", e);
+                }
+            }
+        }
+
+        function processExhaustLogic() {
+            const dot = document.getElementById('statusDot');
+            const statusTxt = document.getElementById('statusText');
+            const relayBadge = document.getElementById('relayStatus');
+
+            dot.classList.add('online');
+            statusTxt.innerText = 'Device Online';
+
+            const isHazard = (currentThresholdPPB > 0 && currentTVOC > currentThresholdPPB);
+
+            if (isHazard || cleaningTimer > 0) {
+                if (!isExhaustActive) {
+                    isExhaustActive = true;
+                    const now = new Date();
+                    currentCycleStartTimestamp = now.getTime();
+                    
+                    const d = String(now.getDate()).padStart(2, '0');
+                    const m = String(now.getMonth() + 1).padStart(2, '0');
+                    const y = now.getFullYear();
+                    const hh = String(now.getHours()).padStart(2, '0');
+                    const mm = String(now.getMinutes()).padStart(2, '0');
+                    
+                    currentCycleStartTime = `${d}/${m}/${y} ${hh}.${mm}`;
+                    currentCycleSeconds = 0;
+                    currentCycleMaxTVOC = 0;
+                    currentCycleCO2s = [];
+                    currentCycleTemps = [];
+                }
+
+                currentCycleSeconds++;
+                currentCycleCO2s.push(currentCO2);
+                currentCycleTemps.push(currentTemp);
+
+                if (isHazard) {
+                    if (currentTVOC > currentCycleMaxTVOC) currentCycleMaxTVOC = currentTVOC;
+                    cleaningTimer = 60;
+                    relayBadge.className = 'relay-badge active';
+                    relayBadge.innerText = 'EXHAUST ON (BAHAYA)';
+                } else {
+                    cleaningTimer--;
+                    relayBadge.className = 'relay-badge cleaning';
+                    relayBadge.innerText = `EXHAUST ON (CLEANING ${cleaningTimer}s)`;
+                }
+            } else {
+                if (isExhaustActive) {
+                    isExhaustActive = false;
+
+                    const durationFormatted = formatDurationMMSS(currentCycleSeconds);
+                    const avgCO2 = currentCycleCO2s.length ? (currentCycleCO2s.reduce((a, b) => a + b, 0) / currentCycleCO2s.length) : 0;
+                    const avgTemp = currentCycleTemps.length ? (currentCycleTemps.reduce((a, b) => a + b, 0) / currentCycleTemps.length) : 0;
+
+                    const newLog = {
+                        timestamp: currentCycleStartTimestamp,
+                        waktu: currentCycleStartTime,
+                        station: currentStationName,
+                        tvoc: currentCycleMaxTVOC,
+                        co2: avgCO2,
+                        temp: avgTemp,
+                        status_exhaust: "ON",
+                        durasi_pembuangan: durationFormatted
+                    };
+
+                    exhaustEventLogs.push(newLog);
+                    localStorage.setItem('exhaustEventLogs', JSON.stringify(exhaustEventLogs));
+                }
+
+                relayBadge.className = 'relay-badge';
+                relayBadge.innerText = 'EXHAUST OFF';
+            }
+        }
+
+        // CEK JIKA ESP32 MATI/OFFLINE
+        setInterval(() => {
+            if (lastDataReceivedTime > 0 && (Date.now() - lastDataReceivedTime > 5000)) {
+                const dot = document.getElementById('statusDot');
+                const statusTxt = document.getElementById('statusText');
+                const relayBadge = document.getElementById('relayStatus');
+
+                dot.classList.remove('online');
+                statusTxt.innerText = 'Device Offline';
+                relayBadge.className = 'relay-badge';
+                relayBadge.innerText = 'EXHAUST OFF';
+            }
+        }, 2000);
+
+        function updateThreshold(val) {
+            if (currentUserRole !== 'admin' || val === '' || !mqttClient) return;
+            const message = new Paho.MQTT.Message(String(val));
+            message.destinationName = TOPIC_SET_V2;
+            mqttClient.send(message);
+        }
+
+        function updateStation(val) {
+            if (currentUserRole !== 'admin' || !mqttClient) return;
+            const message = new Paho.MQTT.Message(String(val));
+            message.destinationName = TOPIC_SET_V3;
+            mqttClient.send(message);
+        }
+
+        function updateDisplayValue(elementId, formattedStr) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            el.innerText = formattedStr;
+
+            const len = formattedStr.length;
+            if (len <= 5) el.style.fontSize = '24px';
+            else if (len === 6) el.style.fontSize = '20px';
+            else el.style.fontSize = '16px';
+        }
+
+        function drawGauge(canvasId, value, maxVal = 255) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            const cx = width / 2;
+            const cy = height / 2;
+            const radius = width * 0.40;
+
+            ctx.clearRect(0, 0, width, height);
+            const startAngle = 0.75 * Math.PI;
+            const endAngle = 2.25 * Math.PI;
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, startAngle, endAngle, false);
+            ctx.lineWidth = 16;
+            ctx.strokeStyle = '#32353e';
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            const clampedVal = Math.min(Math.max(value, 0), maxVal);
+            const valAngle = startAngle + (clampedVal / maxVal) * (endAngle - startAngle);
+
+            if (clampedVal > 0) {
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, startAngle, valAngle, false);
+                ctx.lineWidth = 16;
+                ctx.strokeStyle = '#c4f124';
+                ctx.lineCap = 'round';
+                ctx.stroke();
+            }
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('realtimeChart').getContext('2d');
+            trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'TVOC (ppb)', borderColor: '#c4f124', backgroundColor: 'rgba(196, 241, 36, 0.1)', borderWidth: 2, pointRadius: 0, data: [], tension: 0.3 },
+                        { label: 'CO2 (ppm)', borderColor: '#00d2d3', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, data: [], tension: 0.3 },
+                        { label: 'Temp (C)', borderColor: '#ff9f43', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, data: [], tension: 0.3 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { color: '#32353e' }, ticks: { color: '#8b92a2', font: { size: 9 } } },
+                        y: { grid: { color: '#32353e' }, ticks: { color: '#8b92a2', font: { size: 9 } } }
+                    },
+                    plugins: { legend: { labels: { color: '#e0e6ed', font: { size: 10 } } } }
+                }
+            });
+        }
+
+        function addChartData(timeStr, tvoc, co2, temp) {
+            if (!trendChart) return;
+            if (trendChart.data.labels.length >= 15) {
+                trendChart.data.labels.shift();
+                trendChart.data.datasets[0].data.shift();
+                trendChart.data.datasets[1].data.shift();
+                trendChart.data.datasets[2].data.shift();
+            }
+            trendChart.data.labels.push(timeStr);
+            trendChart.data.datasets[0].data.push(tvoc);
+            trendChart.data.datasets[1].data.push(co2);
+            trendChart.data.datasets[2].data.push(temp);
+            trendChart.update('none');
+        }
+
+        function formatDurationMMSS(totalSeconds) {
+            const mins = Math.floor(totalSeconds / 60);
+            const secs = totalSeconds % 60;
+            return `${String(mins).padStart(2, '0')}.${String(secs).padStart(2, '0')}`;
+        }
+
+        function downloadExhaustEventCSV() {
+            const startVal = document.getElementById('startDate').value;
+            const endVal = document.getElementById('endDate').value;
+
+            let startTime = startVal ? new Date(startVal + 'T00:00:00').getTime() : 0;
+            let endTime = endVal ? new Date(endVal + 'T23:59:59').getTime() : Infinity;
+
+            const filtered = exhaustEventLogs.filter(row => row.timestamp >= startTime && row.timestamp <= endTime);
+
+            if (filtered.length === 0) {
+                alert("Tidak ada riwayat Exhaust Nyala pada tanggal yang dipilih!");
+                return;
+            }
+
+            const formatLogNumber = (val) => {
+                if (val === null || val === undefined) return "0";
+                const num = parseFloat(val);
+                if (isNaN(num)) return "0";
+                if (Number.isInteger(num)) return String(num);
+
+                const formatted = num.toFixed(2);
+                if (formatted.endsWith('.00')) return String(Math.round(num));
+                return formatted.replace('.', ',');
+            };
+
+            let csvContent = "\uFEFFsep=;\nWaktu;Station;Kadar TVOC (ppb);Kadar CO2 (ppm);Temperature (C);Status Exhaust;Durasi Pembuangan\n";
+
+            filtered.forEach(row => {
+                const tvocLog = formatLogNumber(row.tvoc);
+                const co2Log = formatLogNumber(row.co2);
+                const tempLog = formatLogNumber(row.temp);
+                const durationFormatted = `="${row.durasi_pembuangan}"`;
+                const waktuFormatted = `="${row.waktu}"`;
+
+                csvContent += `${waktuFormatted};"${row.station}";"${tvocLog}";"${co2Log}";"${tempLog}";"${row.status_exhaust}";${durationFormatted}\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.body.appendChild(document.createElement("a"));
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Log_Exhaust_${Date.now()}.csv`);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
